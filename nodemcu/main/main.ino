@@ -2,63 +2,75 @@
 /*  More information visit : https://netpie.io             */
 
 #include <ESP8266WiFi.h>
-#include <MicroGear.h>
+#include "PubSubClient.h"
 
-const char* ssid     = <WIFI_SSID>;
-const char* password = <WIFI_KEY>;
+const char* ssid     = "FAH";
+const char* password = "025366467";
 
-#define APPID       "8db7eb25-5791-42fa-bb2c-0bdf722afe8e"
+/*#define APPID       "8db7eb25-5791-42fa-bb2c-0bdf722afe8e"
 #define KEY         "nkkCp51Ls8f5e8csMjn6DdU4D6v1kkZB"
 #define SECRET      "JgMMjKv1!2P59X#o8S$cJJI(-v!3(a9G"
 #define ALIAS       "esp8266"
 #define THRESHOLD   100
-#define WEBUSER     "mail@test.com"
+#define WEBUSER     "mail@test.com"*/
 
-WiFiClient client;
-MicroGear nodemcu(client);
+// ^^^^^^^^^^^^^^ NETPIE 2020 configuration ^^^^^^^^^^^^^^^^^^
+const char* mqtt_server = "mqtt.netpie.io";
+const int mqtt_port = 1883;
+const char* mqtt_Client = "8db7eb25-5791-42fa-bb2c-0bdf722afe8e";
+const char* mqtt_username = "nkkCp51Ls8f5e8csMjn6DdU4D6v1kkZB";
+const char* mqtt_password = "JgMMjKv1!2P59X#o8S$cJJI(-v!3(a9G";
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-/* If a new message arrives, do this */
-void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen) {
-    Serial.print("Incoming message --> ");
-    msg[msglen] = '\0';
-    Serial.println((char *)msg);
+//WiFiClient client;
+
+WiFiClient espClient;
+PubSubClient client(espClient); 
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection…");
+    if (client.connect(mqtt_Client, mqtt_username, mqtt_password)) {
+      Serial.println("connected");
+      client.subscribe("@msg/img");
+    }
+    else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println("try again in 5 seconds");
+      delay(5000);
+    }
+  }
 }
 
-void onFoundgear(char *attribute, uint8_t* msg, unsigned int msglen) {
-    Serial.print("Found new member --> ");
-    for (int i=0; i<msglen; i++)
-        Serial.print((char)msg[i]);
-    Serial.println();  
-}
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  String message;
+  for (int i = 0; i < length; i++) {
+    message = message + (char)payload[i];
+  }
+  Serial.println(message);
 
-void onLostgear(char *attribute, uint8_t* msg, unsigned int msglen) {
-    Serial.print("Lost member --> ");
-    for (int i=0; i<msglen; i++)
-        Serial.print((char)msg[i]);
-    Serial.println();
+  /*if(String(topic) == "@msg/led") {
+    if (message == "on"){
+      //digitalWrite(LED1,0);
+      client.publish("@shadow/data/update", "{\"data\" : {\"led\" : \"on\"}}");
+      Serial.println("LED ON");
+    }
+    else if (message == "off") {
+      //digitalWrite(LED1,1);
+      client.publish("@shadow/data/update", "{\"data\" : {\"led\" : \"off\"}}");
+      Serial.println("LED OFF");
+    }
+  }*/
 }
-
-/* When a microgear is connected, do this */
-void onConnected(char *attribute, uint8_t* msg, unsigned int msglen) {
-    Serial.println("Connected to NETPIE...");
-    /* Set the alias of this microgear ALIAS */
-    nodemcu.setAlias(ALIAS);
-}
-
 
 void setup() {
-    /* Add Event listeners */
-    /* Call onMsghandler() when new message arraives */
-    nodemcu.on(MESSAGE,onMsghandler);
 
-    /* Call onFoundgear() when new gear appear */
-    nodemcu.on(PRESENT,onFoundgear);
-
-    /* Call onLostgear() when some gear goes offline */
-    nodemcu.on(ABSENT,onLostgear);
-
-    /* Call onConnected() when NETPIE connection is established */
-    nodemcu.on(CONNECTED,onConnected);
+    client.setServer(mqtt_server, mqtt_port);
+    client.setCallback(callback);
 
     Serial.begin(115200);
     Serial.println("Starting...");
@@ -76,32 +88,16 @@ void setup() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
 
-    /* Initial with KEY, SECRET and also set the ALIAS here */
-    nodemcu.init(KEY,SECRET,ALIAS);
-
-    /* connect to NETPIE to a specific APPID */
-    nodemcu.connect(APPID);
+    reconnect();
 }
 
 void loop() {
-    int infrared = analogRead(A0);
-    Serial.println("Infrared val: ");
-    Serial.println(infrared);
     /* To check if the microgear is still connected */
-    if (nodemcu.connected()) {
-        Serial.println("connected");
-
-        /* Call this method regularly otherwise the connection may be lost */
-        nodemcu.loop();
-
-        if (infrared < THRESHOLD) {
-            Serial.println("Chat to web");
-            nodemcu.chat("web","json of img and email");
-        } 
+    if (client.connected()) {
+        client.loop();
     }
     else {
-        Serial.println("connection lost, reconnect...");
-        nodemcu.connect(APPID);
+        reconnect();
     }
     delay(100);
 }

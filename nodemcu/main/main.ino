@@ -1,11 +1,11 @@
 /*  NETPIE ESP8266 basic sample                            */
 /*  More information visit : https://netpie.io             */
 
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <PubSubClient.h>
 
-const char* ssid     = "FAH";
-const char* password = "025366467";
+const char* ssid     = "Home";
+const char* password = "0836122227";
 
 const char* mqtt_server = "mqtt.netpie.io";
 const int mqtt_port = 1883;
@@ -51,7 +51,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-
     client.setServer(mqtt_server, mqtt_port);
     client.setCallback(callback);
 
@@ -71,19 +70,31 @@ void setup() {
     Serial.println(WiFi.localIP());
 }
 
+const char json[] = "{ \
+  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoic2FuZXlha29ybkBnbWFpbC5jb20iLCJkZXZpY2VOYW1lIjoiZnJvbnQiLCJpYXQiOjE2MjI0NzM1NDR9.k5iA03uj3oDnwl6-uIb9X2huUr4CpxhIl31xZfh0JYE\", \
+  \"image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAEAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwQDAwMEBQQEBAQFBwUFBQUFBwgHBwcHBwcICAgICAgICAoKCgoKCgsLCwsLDQ0NDQ0NDQ0NDf/bAEMBAgICAwMDBgMDBg0JBwkNDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDf/dAAQAAf/aAAwDAQACEQMRAD8A/WXW/H39t61fWxuZI7GzuHtooIpGjEhiOxnkKEMxZgQq52gAcEmt6HxHd+DNc0jTr25ZoNVZI5rSWQyG3MzbY2UsSytkjcucEHpkZrx/xboHxJ+FHi/W9Y8L6K3ifwxr9w2oC2ji8+SyvCd4JRf3gCS/Mu3KkHBwea5v4Y/Dz4lePPHVh4s8a217p2k6ddLfyG/BimvZ0O6NViPzBQ+GYsAMDAz2+LeNxaxKoqEnUcuzslfe+zTR+ePMccsWqCpydVy7PlUb732aa/q5/9k=\" \
+}";
+
 void loop() {
     if (client.connected()) {
         client.loop();
-        /*
-        //if received image from stm32
-        String img;
-        String data = "{\"data\": {\"img\":" + img + "}}";
-        Serial.println(data);
-        data.toCharArray(msg, (data.length() + 1));
-        client.publish("@msg/img", msg);
-        */
-    }
-    else {
+        if (Serial.available() > 0) {
+          char c = Serial.read();
+          unsigned int njson = strlen(json);
+          bool success = client.beginPublish("@msg/img", njson, false);
+          if (success) {
+            for (int i = 0; i < njson; i++) {
+              client.write(json[i]);
+            }
+            success = client.endPublish();
+          }
+          if (success) {
+            Serial.println("Message a sent successfully");
+          } else {
+            Serial.println("Message a failed successfully");
+          }
+        }
+    } else {
         reconnect();
     }
     delay(100);

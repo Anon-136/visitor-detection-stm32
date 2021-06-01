@@ -16,6 +16,7 @@
 //#define CAMERA_MODEL_M5STACK_ESP32CAM // No PSRAM
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 //#define CAMERA_MODEL_TTGO_T_JOURNAL // No PSRAM
+#define BUILTIN_LED 33
 
 #include "camera_pins.h"
 
@@ -50,6 +51,7 @@ void reconnect() {
   }
 }
 
+int interval = 0;
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -64,6 +66,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (message == "on"){
       //Send "alarm on" to stm32
       Serial.println("ALARM ON");
+      digitalWrite(BUILTIN_LED, LOW);
+      interval = 50;
     }
   }
 }
@@ -74,6 +78,9 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println("Starting...");
+
+  Serial2.begin(115200, SERIAL_8N1, 13, 12);
+  pinMode(33, OUTPUT);
 
   Serial.setDebugOutput(true);
   Serial.println();
@@ -158,14 +165,14 @@ void setup() {
   // Serial.println("' to connect");
 }
 
-
+const char token[] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoic2FuZXlha29ybkBnbWFpbC5jb20iLCJkZXZpY2VOYW1lIjoiZnJvbnQiLCJpYXQiOjE2MjI0NzM1NDR9.k5iA03uj3oDnwl6-uIb9X2huUr4CpxhIl31xZfh0JYE";
 
 const char json[] = "{ \
   \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoic2FuZXlha29ybkBnbWFpbC5jb20iLCJkZXZpY2VOYW1lIjoiZnJvbnQiLCJpYXQiOjE2MjI0NzM1NDR9.k5iA03uj3oDnwl6-uIb9X2huUr4CpxhIl31xZfh0JYE\", \
   \"image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAEAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwQDAwMEBQQEBAQFBwUFBQUFBwgHBwcHBwcICAgICAgICAoKCgoKCgsLCwsLDQ0NDQ0NDQ0NDf/bAEMBAgICAwMDBgMDBg0JBwkNDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDf/dAAQAAf/aAAwDAQACEQMRAD8A/WXW/H39t61fWxuZI7GzuHtooIpGjEhiOxnkKEMxZgQq52gAcEmt6HxHd+DNc0jTr25ZoNVZI5rSWQyG3MzbY2UsSytkjcucEHpkZrx/xboHxJ+FHi/W9Y8L6K3ifwxr9w2oC2ji8+SyvCd4JRf3gCS/Mu3KkHBwea5v4Y/Dz4lePPHVh4s8a217p2k6ddLfyG/BimvZ0O6NViPzBQ+GYsAMDAz2+LeNxaxKoqEnUcuzslfe+zTR+ePMccsWqCpydVy7PlUb732aa/q5/9k=\" \
 }";
 
-void capture_image(PubSubClient& client);
+void capture_image(PubSubClient& client, const char* token);
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -174,9 +181,6 @@ void loop() {
       if (Serial.available() > 0) {
         char c = Serial.read();
         if (c == 'a') {
-          capture_image(client);
-        }
-        if (c == 'b') {
           unsigned int njson = strlen(json);
           bool success = client.beginPublish("@msg/img", njson, false);
           if (success) {
@@ -192,8 +196,26 @@ void loop() {
           }
         }
       }
+      if (Serial2.available() > 0) {
+        char c = Serial2.read();
+        Serial.print("Received: ");
+        Serial.println(c);
+
+        if (c == 'A') {
+          Serial.println("Capturing image...");
+          capture_image(client, token);
+        }
+      }
   } else {
       reconnect();
+  }
+  if (interval > 0) {
+    interval -= 1;
+    if (interval % 20 == 0) {
+      digitalWrite(BUILTIN_LED, HIGH);
+    } else if (interval % 10 == 0) {
+      digitalWrite(BUILTIN_LED, LOW);
+    }
   }
   delay(100);
 }

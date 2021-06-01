@@ -216,27 +216,6 @@ static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size
     return len;
 }
 
-unsigned char binary_to_base64(unsigned char v) {
-  // Capital letters - 'A' is ascii 65 and base64 0
-  if(v < 26) return v + 'A';
-  
-  // Lowercase letters - 'a' is ascii 97 and base64 26
-  if(v < 52) return v + 71;
-  
-  // Digits - '0' is ascii 48 and base64 52
-  if(v < 62) return v - 4;
-  
-  // '+' is ascii 43 and base64 62
-  if(v == 62) return '+';
-  
-  // '/' is ascii 47 and base64 63
-  if(v == 63) return '/';
-  
-  return 64;
-}
-
-const char token[] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoic2FuZXlha29ybkBnbWFpbC5jb20iLCJkZXZpY2VOYW1lIjoiZnJvbnQiLCJpYXQiOjE2MjI0NzM1NDR9.k5iA03uj3oDnwl6-uIb9X2huUr4CpxhIl31xZfh0JYE";
-
 static esp_err_t capture_handler(httpd_req_t *req){
     camera_fb_t * fb = NULL;
     esp_err_t res = ESP_OK;
@@ -683,9 +662,22 @@ void startCameraServer() {
     }
 }
 
-esp_err_t capture_image(PubSubClient& client) {
+unsigned char binary_to_base64(unsigned char v) {
+  // Capital letters - 'A' is ascii 65 and base64 0
+  if(v < 26) return v + 'A';
+  // Lowercase letters - 'a' is ascii 97 and base64 26
+  if(v < 52) return v + 71;
+  // Digits - '0' is ascii 48 and base64 52
+  if(v < 62) return v - 4;
+  // '+' is ascii 43 and base64 62
+  if(v == 62) return '+';
+  // '/' is ascii 47 and base64 63
+  if(v == 63) return '/';
+  return 64;
+}
+
+esp_err_t capture_image(PubSubClient& client, const char* token) {
     camera_fb_t *fb = NULL;
-    esp_err_t res = ESP_OK;
     int64_t fr_start = esp_timer_get_time();
 
     fb = esp_camera_fb_get();
@@ -753,8 +745,10 @@ esp_err_t capture_image(PubSubClient& client) {
             client.write((uint8_t *)jsonEnd, len_end);
             success = client.endPublish();
         }
+        esp_camera_fb_return(fb);
         if (success) {
             Serial.println("Test message sent successfully");
+            return ESP_OK;
         } else {
             Serial.println("Test message failed successfully");
             return ESP_FAIL;
@@ -763,5 +757,6 @@ esp_err_t capture_image(PubSubClient& client) {
         Serial.println("Camera did not capture JPEG, CHIPHAILAWE");
         return ESP_FAIL;
     }
-    return res;
+    esp_camera_fb_return(fb);
+    return ESP_FAIL;
 }

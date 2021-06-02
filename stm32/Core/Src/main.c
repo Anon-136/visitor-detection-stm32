@@ -43,6 +43,7 @@
 ADC_HandleTypeDef hadc1;
 
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
@@ -53,6 +54,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -92,15 +94,25 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
+
   /* USER CODE BEGIN 2 */
-  	 uint32_t Vamb;
-     // Read The Sensor Once To Get The Ambient Level
-     // & Calculate The DutyCycle Multiplier
+
+  	 uint32_t Vinfr;
+     // Read The Sensor Once To Get The Infrared Level
+
      HAL_ADC_Start(&hadc1);
      HAL_ADC_PollForConversion(&hadc1, 1);
-     Vamb = HAL_ADC_GetValue(&hadc1);
+     Vinfr = HAL_ADC_GetValue(&hadc1);
 
+     char vbuffer[32];
      char buffer[] = "A";
+
+     uint32_t VinfrAvg = 0;
+     uint32_t n = 0;
+     uint32_t threshold = 100;
+     char displaybuffer[64];
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -109,21 +121,47 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
+    /* USER CODE BEGIN 3 */
 
 	  // Start ADC Conversion
 	  HAL_ADC_Start(&hadc1);
 	  // Poll ADC1 Perihperal & TimeOut = 1mSec
 	  HAL_ADC_PollForConversion(&hadc1, 1);
 	  // Read The ADC Conversion Result
-	  Vamb = HAL_ADC_GetValue(&hadc1);
+	  Vinfr = HAL_ADC_GetValue(&hadc1);
 
-	  if(Vamb > 150 && Vamb < 250){
-		  HAL_UART_Transmit(&huart1, buffer, strlen(buffer), 1000);
-		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		  HAL_Delay(5000);
+	  //Find avg Vinfr at the beginning
+	  if(n == 0){
+		  sprintf(displaybuffer, "Starting...\r\n", VinfrAvg);
+		  HAL_UART_Transmit(&huart2, displaybuffer, strlen(displaybuffer), 1000);
+		  n++;
+	  }else if(n < 10){
+		  VinfrAvg += Vinfr;
+		  n++;
+	  }else if(n == 10){
+		  VinfrAvg += Vinfr;
+		  VinfrAvg /= n;
+		  sprintf(displaybuffer, "Vinfr Avg: %lu\r\n", VinfrAvg);
+		  HAL_UART_Transmit(&huart2, displaybuffer, strlen(displaybuffer), 1000);
+		  sprintf(displaybuffer, "Threshold: %lu\r\n", threshold);
+		  HAL_UART_Transmit(&huart2, displaybuffer, strlen(displaybuffer), 1000);
+		  n++;
 	  }
 
-    /* USER CODE BEGIN 3 */
+	  //Transmit Vinfr to serial via UART2
+	  sprintf(vbuffer, "%lu\r\n", Vinfr);
+	  HAL_UART_Transmit(&huart2, vbuffer, strlen(vbuffer), 1000);
+
+	  sprintf(displaybuffer, "SENSOR DETECTED\r\n");
+
+	  //Transmit Vinfr to NodeMCU via UART1
+	  if( Vinfr < threshold ){
+		  HAL_UART_Transmit(&huart1, buffer, strlen(buffer), 1000);
+		  HAL_UART_Transmit(&huart2, displaybuffer, strlen(displaybuffer), 1000);
+		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+		  HAL_Delay(5000);
+	  }else HAL_Delay(200);
+
   }
   /* USER CODE END 3 */
 }
@@ -256,6 +294,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -278,14 +349,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PA2 PA3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;

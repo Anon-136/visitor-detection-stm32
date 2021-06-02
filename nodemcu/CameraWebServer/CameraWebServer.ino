@@ -16,10 +16,8 @@
 //#define CAMERA_MODEL_M5STACK_ESP32CAM // No PSRAM
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 //#define CAMERA_MODEL_TTGO_T_JOURNAL // No PSRAM
-#define BUILTIN_LED 33
 
 #include "camera_pins.h"
-
 
 const char* ssid     = "Home";
 const char* password = "0836122227";
@@ -66,7 +64,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (message == "on"){
       //Send "alarm on" to stm32
       Serial.println("ALARM ON");
-      digitalWrite(BUILTIN_LED, LOW);
+      digitalWrite(4, LOW);
       interval = 50;
     }
   }
@@ -80,7 +78,7 @@ void setup() {
   Serial.println("Starting...");
 
   Serial2.begin(115200, SERIAL_8N1, 13, 12);
-  pinMode(33, OUTPUT);
+  pinMode(4, OUTPUT);
 
   Serial.setDebugOutput(true);
   Serial.println();
@@ -165,7 +163,7 @@ void setup() {
   // Serial.println("' to connect");
 }
 
-const char token[] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoic2FuZXlha29ybkBnbWFpbC5jb20iLCJkZXZpY2VOYW1lIjoiZnJvbnQiLCJpYXQiOjE2MjI0NzM1NDR9.k5iA03uj3oDnwl6-uIb9X2huUr4CpxhIl31xZfh0JYE";
+const char token[] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiNjIzMjAzNTcyMUBzdHVkZW50LmNodWxhLmFjLnRoIiwiZGV2aWNlTmFtZSI6IkNhbWVyYSAtIEZyb250IiwiaWF0IjoxNjIyNjE2NTcyfQ.UrxffK7sG8HUrZiEQZyQG-cHzNY9E0TavEruCSIY4KU";
 
 const char json[] = "{ \
   \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoic2FuZXlha29ybkBnbWFpbC5jb20iLCJkZXZpY2VOYW1lIjoiZnJvbnQiLCJpYXQiOjE2MjI0NzM1NDR9.k5iA03uj3oDnwl6-uIb9X2huUr4CpxhIl31xZfh0JYE\", \
@@ -212,9 +210,9 @@ void loop() {
   if (interval > 0) {
     interval -= 1;
     if (interval % 20 == 0) {
-      digitalWrite(BUILTIN_LED, HIGH);
+      digitalWrite(4, LOW);
     } else if (interval % 10 == 0) {
-      digitalWrite(BUILTIN_LED, LOW);
+      digitalWrite(4, HIGH);
     }
   }
   delay(100);
